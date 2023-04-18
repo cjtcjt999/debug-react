@@ -450,6 +450,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
 
   // TODO: Remove this dependency on the Scheduler priority.
   // To do that, we're replacing it with an update lane priority.
+  // 根据记录下的事件的优先级，获取任务调度的优先级
   const schedulerPriority = getCurrentPriorityLevel();
 
   // The old behavior was using the priority level of the Scheduler.
@@ -464,8 +465,10 @@ export function requestUpdateLane(fiber: Fiber): Lane {
     (executionContext & DiscreteEventContext) !== NoContext &&
     schedulerPriority === UserBlockingSchedulerPriority
   ) {
+    // 如果是用户阻塞级别的事件，则通过InputDiscreteLanePriority 计算更新的优先级 lane
     lane = findUpdateLane(InputDiscreteLanePriority, currentEventWipLanes);
   } else {
+    // 否则依据事件的优先级计算 schedulerLanePriority
     const schedulerLanePriority = schedulerPriorityToLanePriority(
       schedulerPriority,
     );
@@ -489,7 +492,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
         }
       }
     }
-
+    // 根据计算得到的 schedulerLanePriority，计算更新的优先级 lane
     lane = findUpdateLane(schedulerLanePriority, currentEventWipLanes);
   }
 
@@ -523,9 +526,10 @@ export function scheduleUpdateOnFiber(
   lane: Lane,
   eventTime: number,
 ) {
+  // 第一步，检查是否有无限更新
   checkForNestedUpdates();
   warnAboutRenderPhaseUpdatesInDEV(fiber);
-
+  // 第二步，向上收集fiber.childLanes
   const root = markUpdateLaneFromFiberToRoot(fiber, lane);
   if (root === null) {
     warnAboutUpdateOnUnmountedFiberInDEV(fiber);
@@ -533,6 +537,7 @@ export function scheduleUpdateOnFiber(
   }
 
   // Mark that the root has a pending update.
+  // 第三步，在root上标记更新，将update的lane放到root.pendingLanes
   markRootUpdated(root, lane, eventTime);
 
   if (root === workInProgressRoot) {
@@ -563,15 +568,19 @@ export function scheduleUpdateOnFiber(
 
   // TODO: requestUpdateLanePriority also reads the priority. Pass the
   // priority as an argument to that function and this one.
+  // 根据Scheduler的优先级获取到对应的React优先级
   const priorityLevel = getCurrentPriorityLevel();
 
   if (lane === SyncLane) {
+    // 本次更新是同步的，例如传统的同步渲染模式
     if (
       // Check if we're inside unbatchedUpdates
       (executionContext & LegacyUnbatchedContext) !== NoContext &&
       // Check if we're not already rendering
       (executionContext & (RenderContext | CommitContext)) === NoContext
     ) {
+      // 如果是本次更新是同步的，并且当前还未渲染，意味着主线程空闲，并没有React的
+      // 更新任务在执行，那么调用performSyncWorkOnRoot开始执行同步任务
       // Register pending interactions on the root to avoid losing traced interaction data.
       schedulePendingInteractions(root, lane);
 
@@ -580,6 +589,10 @@ export function scheduleUpdateOnFiber(
       // should be deferred until the end of the batch.
       performSyncWorkOnRoot(root);
     } else {
+      // 如果是本次更新是同步的，不过当前有React更新任务正在进行，
+      // 而且因为无法打断，所以调用ensureRootIsScheduled
+      // 目的是去复用已经在更新的任务，让这个已有的任务
+      // 把这次更新顺便做了
       ensureRootIsScheduled(root, eventTime);
       schedulePendingInteractions(root, lane);
       if (executionContext === NoContext) {
@@ -610,6 +623,7 @@ export function scheduleUpdateOnFiber(
       }
     }
     // Schedule other updates after in case the callback is sync.
+    // 如果是更新是异步的，调用ensureRootIsScheduled去进入异步调度
     ensureRootIsScheduled(root, eventTime);
     schedulePendingInteractions(root, lane);
   }
