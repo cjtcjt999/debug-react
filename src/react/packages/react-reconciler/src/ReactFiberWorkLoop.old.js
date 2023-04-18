@@ -373,14 +373,18 @@ export function getWorkInProgressRoot(): FiberRoot | null {
 export function requestEventTime() {
   if ((executionContext & (RenderContext | CommitContext)) !== NoContext) {
     // We're inside React, so it's fine to read the actual time.
+    // 在 react 执行过程中，直接返回当前时间
     return now();
   }
   // We're not inside React, so we may be in the middle of a browser event.
+  // 如果不在 react 执行过程中
   if (currentEventTime !== NoTimestamp) {
     // Use the same start time for all updates until we enter React again.
+    // 正在执行浏览器事件，返回上次的 currentEventTime
     return currentEventTime;
   }
   // This is the first update since React yielded. Compute a new start time.
+  // react 中断后首次更新，计算新的 currentEventTime
   currentEventTime = now();
   return currentEventTime;
 }

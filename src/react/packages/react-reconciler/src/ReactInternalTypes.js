@@ -45,6 +45,7 @@ export type Dependencies = {
 // A Fiber is work on a Component that needs to be done or was done. There can
 // be more than one per component.
 export type Fiber = {|
+  // 作为静态数据结构，存储节点 dom 相关信息
   // These first fields are conceptually members of an Instance. This used to
   // be split into a separate type and intersected with the other Fiber fields,
   // but until Flow fixes its intersection bugs, we've merged them into a
@@ -63,13 +64,13 @@ export type Fiber = {|
 
   // The value of element.type which is used to preserve the identity during
   // reconciliation of this child.
-  elementType: any,
+  elementType: any, // 元素类型
 
   // The resolved function/class/ associated with this fiber.
-  type: any,
+  type: any, // 定义与此fiber关联的功能或类。对于组件，它指向构造函数；对于DOM元素，它指定HTML tag
 
   // The local state associated with this fiber.
-  stateNode: any,
+  stateNode: any, // 真实 dom 节点
 
   // Conceptual aliases
   // parent : Instance -> return The parent happens to be the same as the
@@ -81,12 +82,13 @@ export type Fiber = {|
   // This is effectively the parent, but there can be multiple parents (two)
   // so this is only the parent of the thing we're currently processing.
   // It is conceptually the same as the return address of a stack frame.
-  return: Fiber | null,
+  // fiber 链表树相关
+  return: Fiber | null, // 父 fiber
 
   // Singly Linked List Tree Structure.
-  child: Fiber | null,
-  sibling: Fiber | null,
-  index: number,
+  child: Fiber | null, // 第一个子 fiber
+  sibling: Fiber | null, // 下一个兄弟 fiber
+  index: number, // 在父 fiber 下面的子 fiber 中的下标
 
   // The ref last used to attach this node.
   // I'll avoid adding an owner field for prod and model that as functions.
@@ -96,16 +98,20 @@ export type Fiber = {|
     | RefObject,
 
   // Input is the data coming into process this fiber. Arguments. Props.
-  pendingProps: any, // This type will be more specific once we overload the tag.
-  memoizedProps: any, // The props used to create the output.
+  // 工作单元，用于计算 state 和 props 渲染
+  pendingProps: any, // This type will be more specific once we overload the tag. // 本次渲染需要使用的 props
+  memoizedProps: any, // The props used to create the output. // 上次渲染使用的 props
 
   // A queue of state updates and callbacks.
+  // 用于状态更新、回调函数、DOM更新的队列，保存发起更新的的环形链表（class组件或者function组件）
   updateQueue: mixed,
 
   // The state used to create the output
+  // 上次渲染后的 state 状态，当前state，保存function组件上挂载了的 useState hooks环形链表
   memoizedState: any,
 
   // Dependencies (contexts, events) for this fiber, if it has any
+  // contexts、events 等依赖
   dependencies: Dependencies | null,
 
   // Bitfield that describes properties about the fiber and its subtree. E.g.
@@ -117,26 +123,40 @@ export type Fiber = {|
   mode: TypeOfMode,
 
   // Effect
-  flags: Flags,
-  subtreeFlags: Flags,
-  deletions: Array<Fiber> | null,
+  // 副作用相关
+
+  // react 中通过 flags 记录每个节点 diff 后需要变更的状态，例如 dom 的添加、替换、删除等等。
+  flags: Flags, // 记录更新时当前 fiber 的副作用(删除、更新、替换等)状态
+  subtreeFlags: Flags, // 当前子树的副作用状态
+  deletions: Array<Fiber> | null, // 要删除的子 fiber
 
   // Singly linked list fast path to the next fiber with side-effects.
+  // 下一个有副作用的 fiber
   nextEffect: Fiber | null,
 
   // The first and last fiber with side-effect within this subtree. This allows
   // us to reuse a slice of the linked list when we reuse the work done within
   // this fiber.
+  // 指向第一个有副作用的 fiber
   firstEffect: Fiber | null,
-  lastEffect: Fiber | null,
+  lastEffect: Fiber | null, // 指向最后一个有副作用的 fiber
 
+  // 优先级相关
+  // lane 代表 react 要执行的 fiber 任务的优先级，通过这个字段，render 阶段 react 确定应该优先将哪些任务提交到 commit 阶段去执行
+  // 同 Flags 的枚举值一样，Lanes 也是用 31 位的二进制数表示，表示了 31 条赛道，位数越小的赛道，代表的优先级越高。
+  // 例如 InputDiscreteHydrationLane、InputDiscreteLanes、InputContinuousHydrationLane 等用户交互引起的更新的优先级较高，
+  // DefaultLanes 这种请求数据引起更新的优先级中等，而 OffscreenLane、IdleLanes 这种优先级较低。
+  // 优先级越低的任务，在 render 阶段越容易被打断，commit 执行的时机越靠后。
   lanes: Lanes,
   childLanes: Lanes,
 
   // This is a pooled version of a Fiber. Every fiber that gets updated will
   // eventually have a pair. There are cases when we can clean up pairs to save
   // memory if we need to.
-  alternate: Fiber | null,
+  // 当 react 的状态发生更新时，当前页面所对应的 fiber 树称为 current Fiber，同时 react 会根据新的状态构建一颗新的 fiber 树，
+  // 称为 workInProgress Fiber。current Fiber 中每个 fiber 节点通过 alternate 字段，指向 workInProgress Fiber 中对应的 fiber 节点。
+  // 同样 workInProgress Fiber 中的 fiber节点的 alternate 字段也会指向 current Fiber 中对应的 fiber 节点。
+  alternate: Fiber | null, // 指向 workInProgress fiber 树中对应的节点
 
   // Time spent rendering this Fiber and its descendants for the current update.
   // This tells us how well the tree makes use of sCU for memoization.

@@ -176,6 +176,10 @@ function warnOnInvalidCallback(callback: mixed, callerName: string): void {
  * render方法真正调用的主方法
  * 主要步骤有初次渲染，创建fiberroot对象->将更新
  */
+// 首先调用 legacyRenderSubtreeIntoContainer 函数，校验根节点 root 是否存在
+// 若不存在，调用 legacyCreateRootFromDOMContainer 创建根节点 root、rootFiber 和 fiberRoot 并绑定它们之间的引用关系
+// 然后调用 updateContainer 去非批量执行后面的更新流程；若存在，直接调用 updateContainer 去批量执行后面的更新流程：
+
 function legacyRenderSubtreeIntoContainer(
   parentComponent: ?React$Component<any, any>,
   children: ReactNodeList,
@@ -194,6 +198,8 @@ function legacyRenderSubtreeIntoContainer(
   let fiberRoot;
   if (!root) {
     // Initial mount 初次渲染
+    // 首次渲染时根节点不存在
+    // 通过 legacyCreateRootFromDOMContainer 创建根节点、fiberRoot 和 rootFiber
     root = container._reactRootContainer = legacyCreateRootFromDOMContainer( //创建fiber结构
       container,
       forceHydrate,
@@ -221,6 +227,7 @@ function legacyRenderSubtreeIntoContainer(
       };
     }
     // Update
+    // 批量执行更新流程
     updateContainer(children, fiberRoot, parentComponent, callback);
   }
   return getPublicRootInstance(fiberRoot);

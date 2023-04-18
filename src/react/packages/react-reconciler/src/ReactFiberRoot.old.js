@@ -80,6 +80,9 @@ function FiberRootNode(containerInfo, tag, hydrate) {
   }
 }
 
+// 在 createFiberRoot 函数中，调用 FiberRootNode 构造函数，创建了 fiberRoot，它指向真实根 dom 节点。
+// 另外 createFiberRoot 函数中，还让 rootFiber 的 stateNode 字段指向了 fiberRoot，fiberRoot 的 current 字段指向了 rootFiber。
+// 从而一颗最原始的 fiber 树根节点就创建完成了
 export function createFiberRoot(
   containerInfo: any,
   tag: RootTag,
@@ -94,9 +97,10 @@ export function createFiberRoot(
   // Cyclic construction. This cheats the type system right now because
   // stateNode is any.
   const uninitializedFiber = createHostRootFiber(tag);
-  root.current = uninitializedFiber;
-  uninitializedFiber.stateNode = root;
-
+  // 对应着 FiberRoot,const fiber = document.querySelector('#root')._reactRootContainer._internalRoot
+  root.current = uninitializedFiber;// 指向RootFiber
+  uninitializedFiber.stateNode = root;// 指向FiberRoot
+  console.log('FiberRoot：', root)
   initializeUpdateQueue(uninitializedFiber);
 
   return root;

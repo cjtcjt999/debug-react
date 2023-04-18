@@ -146,15 +146,18 @@ function warnIfStringRefCannotBeAutoConverted(config) {
 const ReactElement = function(type, key, ref, self, source, owner, props) {
   const element = {
     // This tag allows us to uniquely identify this as a React Element
+    // 用于表示是否为 ReactElement
     $$typeof: REACT_ELEMENT_TYPE,
 
     // Built-in properties that belong on the element
+    // 用于创建真实 dom 的相关信息
     type: type,
     key: key,
     ref: ref,
     props: props,
 
     // Record the component responsible for creating this element.
+    // 记录负责创建此元素的组件
     _owner: owner,
   };
 
@@ -169,6 +172,7 @@ const ReactElement = function(type, key, ref, self, source, owner, props) {
     // the validation flag non-enumerable (where possible, which should
     // include every environment we run tests in), so the test framework
     // ignores it.
+    // 开发环境下将 _store、_self、_source 设置为不可枚举，提高 element 的比较性能
     Object.defineProperty(element._store, 'validated', {
       configurable: false,
       enumerable: false,
@@ -190,6 +194,7 @@ const ReactElement = function(type, key, ref, self, source, owner, props) {
       writable: false,
       value: source,
     });
+    // 冻结 element 和 props，防止被手动修改
     if (Object.freeze) {
       Object.freeze(element.props);
       Object.freeze(element);
@@ -349,6 +354,7 @@ export function createElement(type, config, children) {
   let propName;
 
   // Reserved names are extracted
+  // 记录标签上的属性集合
   const props = {};
 
   let key = null;
@@ -356,8 +362,11 @@ export function createElement(type, config, children) {
   let self = null;
   let source = null;
 
+  // config 不为 null 时，说明标签上有属性，将属性添加到 props 中
+  // 其中，key 和 ref 为 react 提供的特殊属性，不加入到 props 中，而是用 key 和 ref 单独记录
   if (config != null) {
     if (hasValidRef(config)) {
+      // 有合法的 ref 时，则给 ref 赋值
       ref = config.ref;
 
       if (__DEV__) {
@@ -365,12 +374,15 @@ export function createElement(type, config, children) {
       }
     }
     if (hasValidKey(config)) {
+      // 有合法的 key 时，则给 key 赋值
       key = '' + config.key;
     }
 
+    // self 和 source 是开发环境下对代码在编译器中位置等信息进行记录，用于开发环境下调试
     self = config.__self === undefined ? null : config.__self;
     source = config.__source === undefined ? null : config.__source;
     // Remaining properties are added to a new props object
+    // 将 config 中除 key、ref、__self、__source 之外的属性添加到 props 中
     for (propName in config) {
       if (
         hasOwnProperty.call(config, propName) &&
@@ -381,16 +393,20 @@ export function createElement(type, config, children) {
     }
   }
 
+  // 将子节点添加到 props 的 children 属性上
   // Children can be more than one argument, and those are transferred onto
   // the newly allocated props object.
   const childrenLength = arguments.length - 2;
   if (childrenLength === 1) {
+    // 共 3 个参数时表示只有一个子节点，直接将子节点赋值给 props 的 children 属性
     props.children = children;
   } else if (childrenLength > 1) {
+    // 3 个以上参数时表示有多个子节点，将子节点 push 到一个数组中然后将数组赋值给 props 的 children
     const childArray = Array(childrenLength);
     for (let i = 0; i < childrenLength; i++) {
       childArray[i] = arguments[i + 2];
     }
+    // 开发环境下冻结 childArray，防止被随意修改
     if (__DEV__) {
       if (Object.freeze) {
         Object.freeze(childArray);
@@ -400,6 +416,8 @@ export function createElement(type, config, children) {
   }
 
   // Resolve default props
+  // 如果有 defaultProps，对其遍历并且将用户在标签上未对其手动设置属性添加进 props 中
+  // 此处针对 class 组件类型
   if (type && type.defaultProps) {
     const defaultProps = type.defaultProps;
     for (propName in defaultProps) {
@@ -408,6 +426,9 @@ export function createElement(type, config, children) {
       }
     }
   }
+
+  // key 和 ref 不挂载到 props 上
+  // 开发环境下若想通过 props.key 或者 props.ref 获取则 warning
   if (__DEV__) {
     if (key || ref) {
       const displayName =
@@ -422,6 +443,7 @@ export function createElement(type, config, children) {
       }
     }
   }
+  // 调用 ReactElement 并返回
   return ReactElement(
     type,
     key,

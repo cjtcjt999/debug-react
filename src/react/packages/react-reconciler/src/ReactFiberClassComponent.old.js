@@ -194,10 +194,10 @@ const classComponentUpdater = {
   isMounted,
   enqueueSetState(inst, payload, callback) {
     const fiber = getInstance(inst);
-    const eventTime = requestEventTime();
-    const lane = requestUpdateLane(fiber);
+    const eventTime = requestEventTime(); // 获取更新触发的时间
+    const lane = requestUpdateLane(fiber); // 获取任务优先级
 
-    const update = createUpdate(eventTime, lane);
+    const update = createUpdate(eventTime, lane); // 创建更新任务
     update.payload = payload;
     if (callback !== undefined && callback !== null) {
       if (__DEV__) {
@@ -206,8 +206,8 @@ const classComponentUpdater = {
       update.callback = callback;
     }
 
-    enqueueUpdate(fiber, update);
-    scheduleUpdateOnFiber(fiber, lane, eventTime);
+    enqueueUpdate(fiber, update); // 将任务推入更新队列
+    scheduleUpdateOnFiber(fiber, lane, eventTime); // schedule 进行调度
 
     if (__DEV__) {
       if (enableDebugTracing) {

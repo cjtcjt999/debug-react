@@ -253,7 +253,7 @@ export function resolveLazyComponentTag(Component: Function): WorkTag {
 // This is used to create an alternate fiber to do work on.
 export function createWorkInProgress(current: Fiber, pendingProps: any): Fiber {
   let workInProgress = current.alternate;
-  if (workInProgress === null) {
+  if (workInProgress === null) { // 区分 mount 还是 update
     // We use a double buffering pooling technique because we know that we'll
     // only ever need at most two versions of a tree. We pool the "other" unused
     // node that we're free to reuse. This is lazily created to avoid allocating
@@ -302,7 +302,7 @@ export function createWorkInProgress(current: Fiber, pendingProps: any): Fiber {
       workInProgress.actualStartTime = -1;
     }
   }
-
+  // 重置所有的副作用
   workInProgress.childLanes = current.childLanes;
   workInProgress.lanes = current.lanes;
 
@@ -313,6 +313,7 @@ export function createWorkInProgress(current: Fiber, pendingProps: any): Fiber {
 
   // Clone the dependencies object. This is mutated during the render phase, so
   // it cannot be shared with the current fiber.
+  // 克隆依赖
   const currentDependencies = current.dependencies;
   workInProgress.dependencies =
     currentDependencies === null

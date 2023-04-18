@@ -17,16 +17,19 @@ if (__DEV__) {
 /**
  * Base class helpers for the updating state of a component.
  */
-function Component(props, context, updater) {
+function Component (props, context, updater) {
+  // 接收 props，context，updater 进行初始化，挂载到 this 上
   this.props = props;
   this.context = context;
   // If a component has string refs, we will assign a different object later.
   this.refs = emptyObject;
   // We initialize the default updater but the real one gets injected by the
   // renderer.
+  // updater 上挂载了 isMounted、enqueueForceUpdate、enqueueSetState 等触发器方法
   this.updater = updater || ReactNoopUpdateQueue;
 }
 
+// 原型链上挂载 isReactComponent，在 ReactDOM.render 时用于和函数组件做区分
 Component.prototype.isReactComponent = {};
 
 /**
@@ -54,7 +57,9 @@ Component.prototype.isReactComponent = {};
  * @final
  * @protected
  */
-Component.prototype.setState = function(partialState, callback) {
+// 给类组件添加 `this.setState` 方法
+Component.prototype.setState = function (partialState, callback) {
+  // 验证参数是否合法
   invariant(
     typeof partialState === 'object' ||
       typeof partialState === 'function' ||
@@ -62,6 +67,7 @@ Component.prototype.setState = function(partialState, callback) {
     'setState(...): takes an object of state variables to update or a ' +
       'function which returns an object of state variables.',
   );
+  // 添加至 enqueueSetState 队列
   this.updater.enqueueSetState(this, partialState, callback, 'setState');
 };
 
@@ -79,7 +85,9 @@ Component.prototype.setState = function(partialState, callback) {
  * @final
  * @protected
  */
+// 给类组件添加 `this.forceUpdate` 方法
 Component.prototype.forceUpdate = function(callback) {
+  // 添加至 enqueueForceUpdate 队列
   this.updater.enqueueForceUpdate(this, callback, 'forceUpdate');
 };
 
