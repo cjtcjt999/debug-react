@@ -183,22 +183,24 @@ export function cloneUpdateQueue<State>(
 
 export function createUpdate(eventTime: number, lane: Lane): Update<*> {
   const update: Update<*> = {
-    eventTime,
-    lane,
+    eventTime, // 更新要出发的事件
+    lane, // 优先级
 
-    tag: UpdateState,
-    payload: null,
-    callback: null,
+    tag: UpdateState, // 指定更新的类型，0更新 1替换 2强制更新 3捕获性的更新
+    payload: null, // 要更新的内容，例如 setState 接收的第一个参数
+    callback: null, // 更新完成后的回调
 
-    next: null,
+    next: null, // 指向下一个更新
   };
   return update;
 }
 
-export function enqueueUpdate<State>(fiber: Fiber, update: Update<State>) {
+export function enqueueUpdate<State> (fiber: Fiber, update: Update<State>) {
+  // 获取当前 fiber 的更新队列
   const updateQueue = fiber.updateQueue;
   if (updateQueue === null) {
     // Only occurs if the fiber has been unmounted.
+    // 若 updateQueue 为空，表示 fiber 还未渲染，直接退出
     return;
   }
 
@@ -206,8 +208,10 @@ export function enqueueUpdate<State>(fiber: Fiber, update: Update<State>) {
   const pending = sharedQueue.pending;
   if (pending === null) {
     // This is the first update. Create a circular list.
+    // pending 为 null 时表示首次更新，创建循环列表
     update.next = update;
   } else {
+    // 将 update 插入到循环列表中
     update.next = pending.next;
     pending.next = update;
   }

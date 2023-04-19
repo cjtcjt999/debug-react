@@ -451,6 +451,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
   // TODO: Remove this dependency on the Scheduler priority.
   // To do that, we're replacing it with an update lane priority.
   // 根据记录下的事件的优先级，获取任务调度的优先级
+  // getCurrentPriorityLevel负责读取记录在Scheduler中的优先级
   const schedulerPriority = getCurrentPriorityLevel();
 
   // The old behavior was using the priority level of the Scheduler.
@@ -492,7 +493,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
         }
       }
     }
-    // 根据计算得到的 schedulerLanePriority，计算更新的优先级 lane
+    // 根据优先级和已有的lane去计算新的lane优先级
     lane = findUpdateLane(schedulerLanePriority, currentEventWipLanes);
   }
 
@@ -689,23 +690,29 @@ function markUpdateLaneFromFiberToRoot(
 // of the existing task is the same as the priority of the next level that the
 // root has work on. This function is called on every update, and right before
 // exiting a task.
-function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
+function ensureRootIsScheduled (root: FiberRoot, currentTime: number) {
+  // 获取旧任务
   const existingCallbackNode = root.callbackNode;
 
   // Check if any lanes are being starved by other work. If so, mark them as
   // expired so we know to work on those next.
+  // 记录任务的过期时间，检查是否有过期任务，有则立即将它放到root.expiredLanes，
+  // 便于接下来将这个任务以同步模式立即调度
   markStarvedLanesAsExpired(root, currentTime);
 
   // Determine the next lanes to work on, and their priority.
+  // 获取renderLanes，顺便计算任务优先级
   const nextLanes = getNextLanes(
     root,
     root === workInProgressRoot ? workInProgressRootRenderLanes : NoLanes,
   );
   // This returns the priority level computed during the `getNextLanes` call.
+  // 获取上面计算得出renderLanes对应的任务优先级
   const newCallbackPriority = returnNextLanesPriority();
 
   if (nextLanes === NoLanes) {
     // Special case: There's nothing to work on.
+    // 如果渲染优先级为空，则不需要调度
     if (existingCallbackNode !== null) {
       cancelCallback(existingCallbackNode);
       root.callbackNode = null;
@@ -715,40 +722,51 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
   }
 
   // Check if there's an existing task. We may be able to reuse it.
+  // 如果存在旧任务，那么看一下能否复用
   if (existingCallbackNode !== null) {
+    // 获取旧任务的优先级
     const existingCallbackPriority = root.callbackPriority;
+    // 如果新旧任务的优先级相同，则无需调度
     if (existingCallbackPriority === newCallbackPriority) {
       // The priority hasn't changed. We can reuse the existing task. Exit.
       return;
     }
     // The priority changed. Cancel the existing callback. We'll schedule a new
     // one below.
+    // 代码执行到这里说明新任务的优先级高于旧任务的优先级
+    // 取消掉旧任务，实现高优先级任务插队
     cancelCallback(existingCallbackNode);
   }
 
   // Schedule a new callback.
+  // 调度一个新任务
   let newCallbackNode;
   if (newCallbackPriority === SyncLanePriority) {
     // Special case: Sync React callbacks are scheduled on a special
     // internal queue
+    // 若新任务的优先级为同步优先级，则同步调度，传统的同步渲染和过期任务会走这里
     newCallbackNode = scheduleSyncCallback(
       performSyncWorkOnRoot.bind(null, root),
     );
   } else if (newCallbackPriority === SyncBatchedLanePriority) {
+    // 同步模式到concurrent模式的过渡模式：blocking模式会走这里
     newCallbackNode = scheduleCallback(
       ImmediateSchedulerPriority,
       performSyncWorkOnRoot.bind(null, root),
     );
   } else {
+    // concurrent模式的渲染会走这里
+    // 根据任务优先级获取Scheduler的调度优先级
     const schedulerPriorityLevel = lanePriorityToSchedulerPriority(
       newCallbackPriority,
     );
+    // 计算出调度优先级之后，开始让Scheduler调度React的更新任务
     newCallbackNode = scheduleCallback(
       schedulerPriorityLevel,
       performConcurrentWorkOnRoot.bind(null, root),
     );
   }
-
+  // 更新root上的任务优先级和任务，以便下次发起调度时候可以获取到
   root.callbackPriority = newCallbackPriority;
   root.callbackNode = newCallbackNode;
 }
@@ -1704,6 +1722,7 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
         !enableProfilerTimer ||
         (completedWork.mode & ProfileMode) === NoMode
       ) {
+        // 对节点进行completeWork，生成DOM，更新props，绑定事件
         next = completeWork(current, completedWork, subtreeRenderLanes);
       } else {
         startProfilerTimer(completedWork);
@@ -1726,6 +1745,7 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
         // Do not append effects to parents if a sibling failed to complete
         (returnFiber.flags & Incomplete) === NoFlags
       ) {
+        // 将当前节点的 effectList 并入到父节点的 effectList
         // Append all the effects of the subtree and this fiber onto the effect
         // list of the parent. The completion order of the children affects the
         // side-effect order.
@@ -1745,6 +1765,7 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
         // schedule our own side-effect on our own list because if end up
         // reusing children we'll schedule this effect onto itself since we're
         // at the end.
+        // 将自身添加到 effectList 链，添加时跳过 NoWork 和 PerformedWork的 flags，因为真正的 commit 时用不到
         const flags = completedWork.flags;
 
         // Skip both NoWork and PerformedWork tags when creating the effect

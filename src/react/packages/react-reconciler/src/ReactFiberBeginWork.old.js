@@ -1074,6 +1074,7 @@ function updateHostRoot(current, workInProgress, renderLanes) {
   }
   const root: FiberRoot = workInProgress.stateNode;
   if (root.hydrate && enterHydrationState(workInProgress)) {
+    // 若根 fiber 不存在，说明是首次渲染，调用 mountChildFibers
     // If we don't have any current children this might be the first pass.
     // We always try to hydrate. If this isn't a hydration pass there won't
     // be any children to hydrate which is effectively the same thing as
@@ -1115,6 +1116,7 @@ function updateHostRoot(current, workInProgress, renderLanes) {
   } else {
     // Otherwise reset hydration state in case we aborted and resumed another
     // root.
+    // 若根 fiber 存在，调用 reconcileChildren
     reconcileChildren(current, workInProgress, nextChildren, renderLanes);
     resetHydrationState();
   }
@@ -3317,7 +3319,7 @@ function beginWork(
   // sometimes bails out later in the begin phase. This indicates that we should
   // move this assignment out of the common path and into each branch.
   workInProgress.lanes = NoLanes;
-
+  // 针对 workInProgress 的tag，执行相应的更新
   switch (workInProgress.tag) {
     case IndeterminateComponent: {
       return mountIndeterminateComponent(
