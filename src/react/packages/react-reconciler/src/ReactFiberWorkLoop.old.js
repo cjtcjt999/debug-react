@@ -709,7 +709,7 @@ function ensureRootIsScheduled (root: FiberRoot, currentTime: number) {
   // This returns the priority level computed during the `getNextLanes` call.
   // 获取上面计算得出renderLanes对应的任务优先级
   const newCallbackPriority = returnNextLanesPriority();
-
+  console.log('nextLanes：', nextLanes, 'newCallbackPriority：', newCallbackPriority)
   if (nextLanes === NoLanes) {
     // Special case: There's nothing to work on.
     // 如果渲染优先级为空，则不需要调度
@@ -718,6 +718,7 @@ function ensureRootIsScheduled (root: FiberRoot, currentTime: number) {
       root.callbackNode = null;
       root.callbackPriority = NoLanePriority;
     }
+    console.log('渲染优先级为空，不需要调度')
     return;
   }
 
@@ -728,6 +729,7 @@ function ensureRootIsScheduled (root: FiberRoot, currentTime: number) {
     const existingCallbackPriority = root.callbackPriority;
     // 如果新旧任务的优先级相同，则无需调度
     if (existingCallbackPriority === newCallbackPriority) {
+      console.log('新旧任务的优先级相同，无需调度')
       // The priority hasn't changed. We can reuse the existing task. Exit.
       return;
     }
@@ -735,6 +737,7 @@ function ensureRootIsScheduled (root: FiberRoot, currentTime: number) {
     // one below.
     // 代码执行到这里说明新任务的优先级高于旧任务的优先级
     // 取消掉旧任务，实现高优先级任务插队
+    console.log('取消掉旧任务，实现高优先级任务插队', '旧任务优先级：', existingCallbackPriority)
     cancelCallback(existingCallbackNode);
   }
 
@@ -745,11 +748,13 @@ function ensureRootIsScheduled (root: FiberRoot, currentTime: number) {
     // Special case: Sync React callbacks are scheduled on a special
     // internal queue
     // 若新任务的优先级为同步优先级，则同步调度，传统的同步渲染和过期任务会走这里
+    console.log('新任务的优先级为同步优先级，同步调度')
     newCallbackNode = scheduleSyncCallback(
       performSyncWorkOnRoot.bind(null, root),
     );
   } else if (newCallbackPriority === SyncBatchedLanePriority) {
     // 同步模式到concurrent模式的过渡模式：blocking模式会走这里
+    console.log('blocking模式会走这里')
     newCallbackNode = scheduleCallback(
       ImmediateSchedulerPriority,
       performSyncWorkOnRoot.bind(null, root),
@@ -760,6 +765,7 @@ function ensureRootIsScheduled (root: FiberRoot, currentTime: number) {
     const schedulerPriorityLevel = lanePriorityToSchedulerPriority(
       newCallbackPriority,
     );
+    console.log('concurrent模式的渲染会走这里', 'schedulerPriorityLevel:', schedulerPriorityLevel)
     // 计算出调度优先级之后，开始让Scheduler调度React的更新任务
     newCallbackNode = scheduleCallback(
       schedulerPriorityLevel,
