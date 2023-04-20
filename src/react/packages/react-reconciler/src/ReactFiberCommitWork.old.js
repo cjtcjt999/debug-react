@@ -228,8 +228,11 @@ function commitBeforeMutationLifeCycles(
     case ClassComponent: {
       if (finishedWork.flags & Snapshot) {
         if (current !== null) {
+          // 非首次加载的情况下
+          // 获取上一次的 props 和 state
           const prevProps = current.memoizedProps;
           const prevState = current.memoizedState;
+          // 获取当前 class 组件实例
           const instance = finishedWork.stateNode;
           // We could update instance props and state here,
           // but instead we rely on them being set during last render.
@@ -261,6 +264,7 @@ function commitBeforeMutationLifeCycles(
               }
             }
           }
+          // 调用 getSnapshotBeforeUpdate 生命周期方法
           const snapshot = instance.getSnapshotBeforeUpdate(
             finishedWork.elementType === finishedWork.type
               ? prevProps
@@ -278,6 +282,7 @@ function commitBeforeMutationLifeCycles(
               );
             }
           }
+          // 将生成的 snapshot 保存到 instance.__reactInternalSnapshotBeforeUpdate 上，供 DidUpdate 生命周期使用
           instance.__reactInternalSnapshotBeforeUpdate = snapshot;
         }
       }
@@ -488,6 +493,7 @@ function commitLifeCycles(
       const instance = finishedWork.stateNode;
       if (finishedWork.flags & Update) {
         if (current === null) {
+          // 首次渲染，执行 componentDidMount 生命周期
           // We could update instance props and state here,
           // but instead we rely on them being set during last render.
           // TODO: revisit this when we implement resuming.
@@ -533,6 +539,7 @@ function commitLifeCycles(
             instance.componentDidMount();
           }
         } else {
+          // 非首次渲染，执行 componentDidUpdate 生命周期
           const prevProps =
             finishedWork.elementType === finishedWork.type
               ? current.memoizedProps
@@ -629,6 +636,7 @@ function commitLifeCycles(
         // We could update instance props and state here,
         // but instead we rely on them being set during last render.
         // TODO: revisit this when we implement resuming.
+        // 执行 commitUpdateQueue 处理回调
         commitUpdateQueue(finishedWork, updateQueue, instance);
       }
       return;
@@ -651,6 +659,7 @@ function commitLifeCycles(
               break;
           }
         }
+        // 调用 commitUpdateQueue 处理 ReactDOM.render 的回调
         commitUpdateQueue(finishedWork, updateQueue, instance);
       }
       return;
@@ -662,6 +671,7 @@ function commitLifeCycles(
       // (eg DOM renderer may schedule auto-focus for inputs and form controls).
       // These effects should only be committed when components are first mounted,
       // aka when there is no current/alternate.
+      // commitMount 处理 input 标签有 auto-focus 的情况
       if (current === null && finishedWork.flags & Update) {
         const type = finishedWork.type;
         const props = finishedWork.memoizedProps;
@@ -909,14 +919,17 @@ function commitUnmount(
       return;
     }
     case ClassComponent: {
+      // 卸载 ref
       safelyDetachRef(current);
       const instance = current.stateNode;
+      // 执行 componentWillUnmount 生命周期
       if (typeof instance.componentWillUnmount === 'function') {
         safelyCallComponentWillUnmount(current, instance);
       }
       return;
     }
     case HostComponent: {
+      // 卸载 ref
       safelyDetachRef(current);
       return;
     }
@@ -924,6 +937,7 @@ function commitUnmount(
       // TODO: this is recursive.
       // We are also not using this parent because
       // the portal will get pushed immediately.
+      // 递归遍历子树
       if (supportsMutation) {
         unmountHostComponents(finishedRoot, current, renderPriorityLevel);
       } else if (supportsPersistence) {
@@ -974,6 +988,7 @@ function commitNestedUnmounts(
   // we do an inner loop while we're still inside the host node.
   let node: Fiber = root;
   while (true) {
+    // 调用 commitUnmount 去卸载 ref、执行生命周期
     commitUnmount(finishedRoot, node, renderPriorityLevel);
     // Visit children because they may contain more composite or host nodes.
     // Skip portals because commitUnmount() currently visits them recursively.
@@ -983,19 +998,23 @@ function commitNestedUnmounts(
       // If we don't use mutation we drill down into portals here instead.
       (!supportsMutation || node.tag !== HostPortal)
     ) {
+      // 深度优先遍历向下遍历子树
       node.child.return = node;
       node = node.child;
       continue;
     }
     if (node === root) {
+      // node 为 root 时说明整棵树的深度优先遍历完成
       return;
     }
     while (node.sibling === null) {
+      // node.sibling 为 null 时说明当前子树遍历完成，返回上级节点继续深度优先遍历
       if (node.return === null || node.return === root) {
         return;
       }
       node = node.return;
     }
+    // 遍历兄弟节点
     node.sibling.return = node.return;
     node = node.sibling;
   }
@@ -1151,13 +1170,16 @@ function commitPlacement(finishedWork: Fiber): void {
   }
 
   // Recursively insert all host nodes into the parent.
+  // 获取当前 fiber 的父 fiber
   const parentFiber = getHostParentFiber(finishedWork);
 
   // Note: these two variables *must* always be updated together.
   let parent;
   let isContainer;
+  // 获取父 fiber 对应真实 dom 节点
   const parentStateNode = parentFiber.stateNode;
   switch (parentFiber.tag) {
+    // 获取父 fiber 对应的 dom 是否可以作为 container
     case HostComponent:
       parent = parentStateNode;
       isContainer = false;
@@ -1183,13 +1205,14 @@ function commitPlacement(finishedWork: Fiber): void {
           'in React. Please file an issue.',
       );
   }
+  // 如果父 fiber 有 ContentReset 的 flags 副作用，则重置其文本内容
   if (parentFiber.flags & ContentReset) {
     // Reset the text content of the parent before doing any insertions
     resetTextContent(parent);
     // Clear ContentReset from the effect tag
     parentFiber.flags &= ~ContentReset;
   }
-
+  // 获取要在哪个兄弟 fiber 之前插入
   const before = getHostSibling(finishedWork);
   // We only have the top Fiber that was inserted but we need to recurse down its
   // children to find all the terminal nodes.
@@ -1206,8 +1229,10 @@ function insertOrAppendPlacementNodeIntoContainer(
   parent: Container,
 ): void {
   const {tag} = node;
+  // 判断当前节点是否为原生的 dom 节点
   const isHost = tag === HostComponent || tag === HostText;
   if (isHost || (enableFundamentalAPI && tag === FundamentalComponent)) {
+    // 是原生 dom 节点，在父节点的对应位置插入当前节点
     const stateNode = isHost ? node.stateNode : node.stateNode.instance;
     if (before) {
       insertInContainerBefore(parent, stateNode, before);
@@ -1215,10 +1240,12 @@ function insertOrAppendPlacementNodeIntoContainer(
       appendChildToContainer(parent, stateNode);
     }
   } else if (tag === HostPortal) {
+    // 如是 Portal 不做处理
     // If the insertion itself is a portal, then we don't want to traverse
     // down its children. Instead, we'll get insertions from each child in
     // the portal directly.
   } else {
+    // 不是原生 dom 节点，则遍历插入当前节点的各个子节点
     const child = node.child;
     if (child !== null) {
       insertOrAppendPlacementNodeIntoContainer(child, before, parent);
@@ -1281,6 +1308,7 @@ function unmountHostComponents(
 
   while (true) {
     if (!currentParentIsValid) {
+      // 若当前的父节点不是非法的 dom 节点，寻找一个合法的 dom 父节点
       let parent = node.return;
       findParent: while (true) {
         invariant(
@@ -1314,15 +1342,18 @@ function unmountHostComponents(
     }
 
     if (node.tag === HostComponent || node.tag === HostText) {
+      // 若果是原生 dom 节点，调用 commitNestedUnmounts 方法
       commitNestedUnmounts(finishedRoot, node, renderPriorityLevel);
       // After all the children have unmounted, it is now safe to remove the
       // node from the tree.
       if (currentParentIsContainer) {
+        // 若当前的 parent 是 container，则将 child 从 container 中移除(通过 dom.removeChild 方法)
         removeChildFromContainer(
           ((currentParent: any): Container),
           (node.stateNode: Instance | TextInstance),
         );
       } else {
+        // 从 parent 中移除 child(通过 dom.removeChild 方法)
         removeChild(
           ((currentParent: any): Instance),
           (node.stateNode: Instance | TextInstance),
@@ -1372,6 +1403,7 @@ function unmountHostComponents(
         );
       }
     } else if (node.tag === HostPortal) {
+      // 若是 portal 节点，直接向下遍历 child，因为它没有 ref 和生命周期等额外要处理的事情
       if (node.child !== null) {
         // When we go into a portal, it becomes the parent to remove from.
         // We will reassign it back when we pop the portal on the way up.
@@ -1383,6 +1415,7 @@ function unmountHostComponents(
         continue;
       }
     } else {
+      // 其他 react 节点，调用 commitUnmount，里面会卸载 ref、执行生命周期等
       commitUnmount(finishedRoot, node, renderPriorityLevel);
       // Visit children because we may find more host components below.
       if (node.child !== null) {
@@ -1391,9 +1424,11 @@ function unmountHostComponents(
         continue;
       }
     }
+    // node 和 current 相等时说明整颗树的深度优先遍历完成
     if (node === current) {
       return;
     }
+    // 如果没有兄弟节点，说明当前子树遍历完毕，返回到父节点继续深度优先遍历
     while (node.sibling === null) {
       if (node.return === null || node.return === current) {
         return;
@@ -1405,6 +1440,7 @@ function unmountHostComponents(
         currentParentIsValid = false;
       }
     }
+    // 继续遍历兄弟节点
     node.sibling.return = node.return;
     node = node.sibling;
   }
@@ -1416,14 +1452,17 @@ function commitDeletion(
   renderPriorityLevel: ReactPriorityLevel,
 ): void {
   if (supportsMutation) {
+    // 支持 useMutation
     // Recursively delete all host nodes from the parent.
     // Detach refs and call componentWillUnmount() on the whole subtree.
     unmountHostComponents(finishedRoot, current, renderPriorityLevel);
   } else {
+    // 不支持 useMutation
     // Detach refs and call componentWillUnmount() on the whole subtree.
     commitNestedUnmounts(finishedRoot, current, renderPriorityLevel);
   }
   const alternate = current.alternate;
+  // 重置 fiber 的各项属性
   detachFiberMutation(current);
   if (alternate !== null) {
     detachFiberMutation(alternate);
@@ -1526,19 +1565,25 @@ function commitWork(current: Fiber | null, finishedWork: Fiber): void {
       return;
     }
     case HostComponent: {
+      // 获取真实 dom 节点
       const instance: Instance = finishedWork.stateNode;
       if (instance != null) {
+        // 获取新的 props
         // Commit the work prepared earlier.
         const newProps = finishedWork.memoizedProps;
         // For hydration we reuse the update path but we treat the oldProps
         // as the newProps. The updatePayload will contain the real change in
         // this case.
+        // 获取老的 props
         const oldProps = current !== null ? current.memoizedProps : newProps;
         const type = finishedWork.type;
         // TODO: Type the updateQueue to be specific to host components.
+        // 取出 updateQueue
         const updatePayload: null | UpdatePayload = (finishedWork.updateQueue: any);
+        // 清空 updateQueue
         finishedWork.updateQueue = null;
         if (updatePayload !== null) {
+          // 提交更新
           commitUpdate(
             instance,
             updatePayload,
@@ -1557,17 +1602,22 @@ function commitWork(current: Fiber | null, finishedWork: Fiber): void {
         'This should have a text node initialized. This error is likely ' +
           'caused by a bug in React. Please file an issue.',
       );
+      // 获取真实文本节点
       const textInstance: TextInstance = finishedWork.stateNode;
+      // 获取新的文本内容
       const newText: string = finishedWork.memoizedProps;
       // For hydration we reuse the update path but we treat the oldProps
       // as the newProps. The updatePayload will contain the real change in
       // this case.
+      // 获取老的文本内容
       const oldText: string =
         current !== null ? current.memoizedProps : newText;
+      // 提交更新
       commitTextUpdate(textInstance, oldText, newText);
       return;
     }
     case HostRoot: {
+      // ssr操作，暂不关注
       if (supportsHydration) {
         const root: FiberRoot = finishedWork.stateNode;
         if (root.hydrate) {

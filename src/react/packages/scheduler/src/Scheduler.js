@@ -329,6 +329,7 @@ function unstable_scheduleCallback(priorityLevel, callback, options) {
   }
 
   if (startTime > currentTime) {
+    // 当前任务已超时，插入超时队列
     // This is a delayed task.
     newTask.sortIndex = startTime;
     push(timerQueue, newTask);
@@ -344,8 +345,10 @@ function unstable_scheduleCallback(priorityLevel, callback, options) {
       requestHostTimeout(handleTimeout, startTime - currentTime);
     }
   } else {
+    // 任务未超时，插入调度任务队列
     newTask.sortIndex = expirationTime;
     push(taskQueue, newTask);
+    // 符合更新调度执行的标志
     if (enableProfiling) {
       markTaskStart(newTask, currentTime);
       newTask.isQueued = true;
@@ -354,6 +357,7 @@ function unstable_scheduleCallback(priorityLevel, callback, options) {
     // wait until the next time we yield.
     if (!isHostCallbackScheduled && !isPerformingWork) {
       isHostCallbackScheduled = true;
+      // requestHostCallback 调度任务
       requestHostCallback(flushWork);
     }
   }

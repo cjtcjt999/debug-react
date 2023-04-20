@@ -165,6 +165,7 @@ if (
     requestPaint = function() {};
   }
 
+  // 获取当前设备每帧的时长
   forceFrameRate = function(fps) {
     if (fps < 0 || fps > 125) {
       // Using console['error'] to evade Babel and ESLint
@@ -182,12 +183,14 @@ if (
     }
   };
 
+  // 帧结束前执行任务
   const performWorkUntilDeadline = () => {
     if (scheduledHostCallback !== null) {
       const currentTime = getCurrentTime();
       // Yield after `yieldInterval` ms, regardless of where we are in the vsync
       // cycle. This means there's always time remaining at the beginning of
       // the message event.
+      // 更新当前帧的结束时间
       deadline = currentTime + yieldInterval;
       const hasTimeRemaining = true;
       try {
@@ -195,12 +198,14 @@ if (
           hasTimeRemaining,
           currentTime,
         );
+        // 如果还有调度任务就执行
         if (!hasMoreWork) {
           isMessageLoopRunning = false;
           scheduledHostCallback = null;
         } else {
           // If there's more work, schedule the next message event at the end
           // of the preceding one.
+          // 没有调度任务就通过 postMessage 通知结束
           port.postMessage(null);
         }
       } catch (error) {
@@ -217,10 +222,12 @@ if (
     needsPaint = false;
   };
 
+  // 通过 MessageChannel 创建消息通道，实现任务调度通知
   const channel = new MessageChannel();
   const port = channel.port2;
   channel.port1.onmessage = performWorkUntilDeadline;
 
+  // 通过 postMessage，通知 scheduler 已经开始了帧调度
   requestHostCallback = function(callback) {
     scheduledHostCallback = callback;
     if (!isMessageLoopRunning) {

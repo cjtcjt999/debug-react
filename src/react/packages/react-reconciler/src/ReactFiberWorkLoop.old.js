@@ -603,6 +603,7 @@ export function scheduleUpdateOnFiber(
         // without immediately flushing it. We only do this for user-initiated
         // updates, to preserve historical behavior of legacy mode.
         resetRenderTimer();
+        // 如果当前上下文不在React内部，则直接 flushSyncCallbackQueue；这也解释了在浏览器事件中的setState是同步的
         flushSyncCallbackQueue();
       }
     }
@@ -748,7 +749,7 @@ function ensureRootIsScheduled (root: FiberRoot, currentTime: number) {
     // Special case: Sync React callbacks are scheduled on a special
     // internal queue
     // 若新任务的优先级为同步优先级，则同步调度，传统的同步渲染和过期任务会走这里
-    console.log('新任务的优先级为同步优先级，同步调度')
+    console.log('新任务的优先级为同步优先级（传统的同步渲染和过期任务），同步调度')
     newCallbackNode = scheduleSyncCallback(
       performSyncWorkOnRoot.bind(null, root),
     );
@@ -2015,8 +2016,10 @@ function commitRootImpl(root, renderPriorityLevel) {
   }
 
   // Get the list of effects.
+  // 获取 effectList 链表
   let firstEffect;
   if (finishedWork.flags > PerformedWork) {
+    // 如果 root 上有 effect，则将其添加进 effectList 链表中
     // A fiber's effect list consists only of its children, not itself. So if
     // the root has an effect, we need to add it to the end of the list. The
     // resulting list is the set that would belong to the root's parent, if it
@@ -2029,6 +2032,7 @@ function commitRootImpl(root, renderPriorityLevel) {
     }
   } else {
     // There is no effect on the root.
+    // 如果 root 上没有 effect，直接使用 finishedWork.firstEffect 作用链表头节点
     firstEffect = finishedWork.firstEffect;
   }
 
@@ -2055,7 +2059,7 @@ function commitRootImpl(root, renderPriorityLevel) {
     // getSnapshotBeforeUpdate is called.
     focusedInstanceHandle = prepareForCommit(root.containerInfo);
     shouldFireAfterActiveInstanceBlur = false;
-
+    // 第一次遍历，执行 commitBeforeMutationEffects
     nextEffect = firstEffect;
     do {
       if (__DEV__) {
@@ -2087,6 +2091,7 @@ function commitRootImpl(root, renderPriorityLevel) {
     }
 
     // The next phase is the mutation phase, where we mutate the host tree.
+    // 第二次遍历，执行 commitMutationEffects
     nextEffect = firstEffect;
     do {
       if (__DEV__) {
@@ -2128,6 +2133,7 @@ function commitRootImpl(root, renderPriorityLevel) {
     // The next phase is the layout phase, where we call effects that read
     // the host tree after it's been mutated. The idiomatic use case for this is
     // layout, but class component lifecycles also fire here for legacy reasons.
+    // 第三次遍历，执行 commitLayoutEffects
     nextEffect = firstEffect;
     do {
       if (__DEV__) {
@@ -2166,6 +2172,7 @@ function commitRootImpl(root, renderPriorityLevel) {
     }
   } else {
     // No effects.
+    // 没有任何副作用
     root.current = finishedWork;
     // Measure these anyway so the flamegraph explicitly shows that there were
     // no effects.
@@ -2324,7 +2331,7 @@ function commitBeforeMutationEffects() {
     const flags = nextEffect.flags;
     if ((flags & Snapshot) !== NoFlags) {
       setCurrentDebugFiberInDEV(nextEffect);
-
+      // 如果当前 fiber 节点有 flags 副作用
       commitBeforeMutationEffectOnFiber(current, nextEffect);
 
       resetCurrentDebugFiberInDEV();
@@ -2349,15 +2356,16 @@ function commitMutationEffects(
   renderPriorityLevel: ReactPriorityLevel,
 ) {
   // TODO: Should probably move the bulk of this function to commitWork.
+  // 对 effectList 进行遍历
   while (nextEffect !== null) {
     setCurrentDebugFiberInDEV(nextEffect);
 
     const flags = nextEffect.flags;
-
+    // ContentReset：重置文本节点
     if (flags & ContentReset) {
       commitResetTextContent(nextEffect);
     }
-
+    // Ref：commitDetachRef 更新 ref 的 current 值
     if (flags & Ref) {
       const current = nextEffect.alternate;
       if (current !== null) {
@@ -2376,9 +2384,11 @@ function commitMutationEffects(
     // updates, and deletions. To avoid needing to add a case for every possible
     // bitmap value, we remove the secondary effects from the effect tag and
     // switch on that value.
+    // 执行更新、插入、删除操作
     const primaryFlags = flags & (Placement | Update | Deletion | Hydrating);
     switch (primaryFlags) {
       case Placement: {
+        // 插入
         commitPlacement(nextEffect);
         // Clear the "placement" from effect tag so that we know that this is
         // inserted, before any life-cycles like componentDidMount gets called.
@@ -2389,12 +2399,15 @@ function commitMutationEffects(
       }
       case PlacementAndUpdate: {
         // Placement
+        // 插入并更新
+        // 插入
         commitPlacement(nextEffect);
         // Clear the "placement" from effect tag so that we know that this is
         // inserted, before any life-cycles like componentDidMount gets called.
         nextEffect.flags &= ~Placement;
 
         // Update
+        // 更新
         const current = nextEffect.alternate;
         commitWork(current, nextEffect);
         break;
@@ -2412,11 +2425,13 @@ function commitMutationEffects(
         break;
       }
       case Update: {
+        // 更新
         const current = nextEffect.alternate;
         commitWork(current, nextEffect);
         break;
       }
       case Deletion: {
+        // 删除
         commitDeletion(root, nextEffect, renderPriorityLevel);
         break;
       }
@@ -2439,6 +2454,7 @@ function commitLayoutEffects(root: FiberRoot, committedLanes: Lanes) {
   }
 
   // TODO: Should probably move the bulk of this function to commitWork.
+  // 遍历 effectList
   while (nextEffect !== null) {
     setCurrentDebugFiberInDEV(nextEffect);
 
@@ -2446,9 +2462,11 @@ function commitLayoutEffects(root: FiberRoot, committedLanes: Lanes) {
 
     if (flags & (Update | Callback)) {
       const current = nextEffect.alternate;
+      // 执行 componentDidMount、componentDidUpdate 以及 componentUpdateQueue
       commitLayoutEffectOnFiber(root, current, nextEffect, committedLanes);
     }
 
+    // 更新 ref
     if (enableScopeAPI) {
       // TODO: This is a temporary solution that allowed us to transition away
       // from React Flare on www.

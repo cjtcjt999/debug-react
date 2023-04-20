@@ -10,20 +10,24 @@ export default class DemoTwo extends Component {
     this.setState({
       count: this.state.count + 1,
     })
-    setTimeout(() => {
-      this.setState({
-        count: this.state.count + 1,
-      })
-      this.setState({
-        count: this.state.count + 1,
-      })
-      this.setState({
-        count: this.state.count + 1,
-      })
-      this.setState({
-        count: this.state.count + 1,
-      })
-    }, 0);
+    this.setState({
+      count: this.state.count + 1,
+    })
+    this.setState({
+      count2: this.state.count2 + 1,
+    })
+    // setTimeout(() => {
+    //   this.setState({
+    //     count: this.state.count + 1,
+    //   })
+    //   this.setState({
+    //     count: this.state.count + 2,
+    //   })
+    //   this.setState({
+    //     count2: this.state.count2 + 1,
+    //   })
+    //   console.log('褚锦涛', this.state.count)
+    // }, 0);
   }
 
   render () {
